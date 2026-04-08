@@ -14,7 +14,7 @@ from src.api.akshare_client import akshare_client
 from src.utils.batch_import import importer
 
 
-async def test_database():
+async def _test_database():
     """测试数据库"""
     print("🗄️ 测试数据库...")
     await init_db()
@@ -38,7 +38,7 @@ async def test_database():
     print("✅ 数据库测试完成")
 
 
-async def test_akshare():
+async def _test_akshare():
     """测试AKShare"""
     print("\n📈 测试AKShare...")
     try:
@@ -59,7 +59,7 @@ async def test_akshare():
         print(f"❌ AKShare测试失败: {e}")
 
 
-def test_import():
+def _test_import():
     """测试导入功能"""
     print("\n📥 测试导入功能...")
     test_csv = """symbol,name,strike_price,quantity,custom_threshold
@@ -91,17 +91,17 @@ async def main():
     print("=" * 50)
     
     try:
-        await test_database()
+        await _test_database()
     except Exception as e:
         print(f"❌ 数据库测试失败: {e}")
     
     try:
-        await test_akshare()
+        await _test_akshare()
     except Exception as e:
         print(f"❌ AKShare测试失败: {e}")
     
     try:
-        test_import()
+        _test_import()
     except Exception as e:
         print(f"❌ 导入测试失败: {e}")
     

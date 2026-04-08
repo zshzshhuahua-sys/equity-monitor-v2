@@ -22,7 +22,7 @@ class FakeScheduler:
 
 
 class CrawlSchedulerTests(unittest.TestCase):
-    def test_add_scheduled_job_registers_two_daily_runs(self):
+    def test_add_scheduled_job_registers_daily_run(self):
         service = CrawlSchedulerService()
         service.scheduler = FakeScheduler()
 
@@ -31,7 +31,7 @@ class CrawlSchedulerTests(unittest.TestCase):
         self.assertEqual(len(service.scheduler.jobs), 1)
         job = service.scheduler.jobs[0]
         self.assertEqual(job["id"], service.JOB_ID_SCHEDULED)
-        self.assertEqual(str(job["trigger"]), "cron[hour='10,22', minute='0']")
+        self.assertEqual(str(job["trigger"]), "cron[hour='22', minute='0']")
 
     def test_get_schedule_status_reports_registered_job(self):
         service = CrawlSchedulerService()
@@ -42,7 +42,7 @@ class CrawlSchedulerTests(unittest.TestCase):
         status = service.get_schedule_status()
 
         self.assertEqual(status["job_id"], "scheduled_crawl")
-        self.assertEqual(status["cron_hours"], "10,22")
+        self.assertEqual(status["cron_hours"], "22")
         self.assertEqual(status["timezone"], "Asia/Shanghai")
         self.assertTrue(status["is_running"])
         self.assertTrue(status["registered"])
