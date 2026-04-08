@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股权激励监控面板</title>
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js" defer></script>
+    <style>
+        .alert-normal { color: #10b981; }
+        .alert-watch { color: #f59e0b; }
+        .alert-warning { color: #f97316; }
+        .alert-critical { color: #ef4444; }
+        .bg-alert-normal { background-color: #d1fae5; }
+        .bg-alert-watch { background-color: #fef3c7; }
+        .bg-alert-warning { background-color: #ffedd5; }
+        .bg-alert-critical { background-color: #fee2e2; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航 -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-900">🎯 股权激励监控面板</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="market-status" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100">
+                        检测中...
+                    </span>
+
+                    <button id="monitor-toggle-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        ▶️ 启动监控
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        📊
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">监控股票</p>
+                        <p id="total-stocks" class="text-2xl font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        🟢
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">绿色 (&lt;80%)</p>
+                        <p id="normal-count" class="text-2xl font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                        🟡
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">黄色 (80%-150%)</p>
+                        <p id="watch-count" class="text-2xl font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-red-100 text-red-600">
+                        🔴
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">红色 (&gt;=150%)</p>
+                        <p id="critical-count" class="text-2xl font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 股票表格 -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-900">监控列表</h2>
+                <div class="flex space-x-2">
+                    <input type="file" id="import-file" accept=".csv,.xlsx" class="hidden">
+                    <button onclick="document.getElementById('import-file').click()" 
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+                        📥 导入
+                    </button>
+                    <a href="/api/import/template" download
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+                        📄 模板
+                    </a>
+                    <button id="add-stock-btn" 
+                            class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition">
+                        ➕ 手工添加
+                    </button>
+                    <button id="edit-mode-btn" onclick="toggleEditMode()"
+                            class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                        ✏️ 编辑
+                    </button>
+                    <button id="batch-delete-btn" onclick="batchDelete()" style="display:none;"
+                            class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
+                        🗑️ 删除
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table id="stocks-table" class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="width: 40px;">
+                                <input type="checkbox" id="select-all" onclick="toggleSelectAll()" style="display:none;">
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="width: 50px;">序号</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="width: 90px;">添加日期</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="width: 90px;">代码</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最新价</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">行权价</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">溢价率</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">备注</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stocks-tbody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- 预警弹窗 -->
+    <div id="alert-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">🔔 预警通知</h3>
+            </div>
+            <div id="alert-content" class="px-6 py-4">
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="ack-all-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    全部确认
+                </button>
+                <button id="close-alert-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">✏️ 编辑股票</h3>
+            </div>
+            <div class="px-6 py-4">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">股票代码</label>
+                        <input type="text" id="edit-symbol" class="w-full px-3 py-2 border rounded-lg bg-gray-100" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">股票名称</label>
+                        <input type="text" id="edit-name" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">行权价格 <span class="text-red-500">*</span></label>
+                        <input type="number" id="edit-strike-price" class="w-full px-3 py-2 border rounded-lg" step="0.01">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">持有数量 (股)</label>
+                        <input type="number" id="edit-quantity" class="w-full px-3 py-2 border rounded-lg" step="1" placeholder="可选">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">预警阈值 (%)</label>
+                        <input type="number" id="edit-threshold" class="w-full px-3 py-2 border rounded-lg" step="0.01" placeholder="例如: 15 表示15%">
+                        <p class="text-xs text-gray-500 mt-1">留空使用默认阈值</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+                        <input type="text" id="edit-notes" class="w-full px-3 py-2 border rounded-lg" placeholder="备注信息">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="save-edit-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    保存
+                </button>
+                <button id="cancel-edit-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 手工添加股票弹窗 -->
+    <div id="add-stock-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">➕ 手工添加股票</h3>
+            </div>
+            <div class="px-6 py-4">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">股票代码 <span class="text-red-500">*</span></label>
+                        <input type="text" id="add-symbol" class="w-full px-3 py-2 border rounded-lg" placeholder="例如: 600519 或 000001">
+                        <p class="text-xs text-gray-500 mt-1">支持6位代码，系统自动识别交易所</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">行权价格 <span class="text-red-500">*</span></label>
+                        <input type="number" id="add-strike-price" class="w-full px-3 py-2 border rounded-lg" step="0.01" placeholder="例如: 30.50">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">持有数量 (股)</label>
+                        <input type="number" id="add-quantity" class="w-full px-3 py-2 border rounded-lg" placeholder="可选">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">预警阈值 (%)</label>
+                        <input type="number" id="add-threshold" class="w-full px-3 py-2 border rounded-lg" step="0.01" placeholder="留空使用默认阈值">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+                        <input type="text" id="add-notes" class="w-full px-3 py-2 border rounded-lg" placeholder="备注信息">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="save-add-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    添加
+                </button>
+                <button id="cancel-add-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js?v=20260321014" defer></script>
+</body>
+</html>

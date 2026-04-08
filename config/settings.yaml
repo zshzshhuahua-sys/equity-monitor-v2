@@ -1,0 +1,19 @@
+alert:
+  cooldown_minutes: 30
+  desktop_notification: true
+  email_notification: true
+  enabled: true
+  thresholds:
+    critical: 0.2
+    warning: 0.1
+    watch: 0.05
+app_name: 股权激励监控面板
+app_version: 1.0.0
+database_url: sqlite+aiosqlite:///{PROJECT_ROOT}/data/equity_monitor.db
+debug: false
+host: 127.0.0.1
+monitor:
+  enabled: true
+  interval_seconds: 300
+  trading_hours_only: false
+port: 8000

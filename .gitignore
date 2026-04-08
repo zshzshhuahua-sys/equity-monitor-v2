@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/README.md
+tests/*.db
+__pycache__/
+*.pyc
