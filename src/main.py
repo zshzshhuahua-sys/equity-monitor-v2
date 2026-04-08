@@ -15,7 +15,7 @@ from src.database import init_db, close_db
 from src.config import settings
 from src.api import import_router, monitor_router, stocks_router, crawl_router
 from src.services.crawl_scheduler_service import crawl_scheduler_service
-from src.notifiers.email import email_notifier
+from src.notifiers.discord import discord_notifier
 
 
 @asynccontextmanager
@@ -28,13 +28,10 @@ async def lifespan(app: FastAPI):
     # 启动爬虫调度器（夜间增量任务）
     crawl_scheduler_service.start()
 
-    email_status = email_notifier.get_status()
+    discord_status = discord_notifier.get_status()
     print(
-        "📧 邮件状态: "
-        f"enabled={email_status['enabled']} "
-        f"host={email_status['smtp_host']} "
-        f"recipients={email_status['recipients_count']} "
-        f"issues={','.join(email_status['issues']) or 'none'}"
+        "💬 Discord 通知: "
+        f"enabled={discord_status['enabled']}"
     )
 
     print(f"🚀 服务启动: http://{settings.host}:{settings.port}")

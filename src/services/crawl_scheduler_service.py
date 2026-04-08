@@ -1,7 +1,7 @@
 """
 爬虫调度服务
 支持：
-  - 定时增量任务（每天10:00、22:00北京时间）
+  - 定时增量任务（每天22:00北京时间）
   - 手动回补任务（按日期范围）
   - 任务状态追踪
 """
@@ -22,7 +22,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from ..database import AsyncSessionLocal
 from ..database.models import Announcement, CrawlLog
-from ..notifiers.email import email_notifier
+from ..notifiers.discord import discord_notifier
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class CrawlSchedulerService:
 
     JOB_ID_SCHEDULED = "scheduled_crawl"
     JOB_ID_PREFIX = "backfill_crawl"
-    SCHEDULE_HOURS = "10,22"
+    SCHEDULE_HOURS = "22"
     SCHEDULE_TIMEZONE = "Asia/Shanghai"
 
     def __init__(self):
@@ -72,7 +72,7 @@ class CrawlSchedulerService:
             self._add_scheduled_job()
             self.scheduler.start()
             self._is_running = True
-            logger.info("爬虫调度器已启动（定时任务 10:00、22:00 北京时间）")
+            logger.info("爬虫调度器已启动（定时任务 22:00 北京时间）")
         except Exception as e:
             logger.exception("爬虫调度器启动失败: %s", e)
 
@@ -102,7 +102,7 @@ class CrawlSchedulerService:
             replace_existing=True,
             max_instances=1,
         )
-        logger.info("已注册定时增量爬取任务（每天 10:00、22:00 北京时间）")
+        logger.info("已注册定时增量爬取任务（每天 22:00 北京时间）")
 
     async def submit_backfill(
         self,
@@ -194,18 +194,18 @@ class CrawlSchedulerService:
                 )
                 return
 
-            # 邮件发送独立处理，失败不影响爬取结果
+            # Discord 通知独立处理，失败不影响爬取结果
             try:
                 crawl_date = datetime.strptime(end_date, "%Y-%m-%d").date()
                 new_anns = await self._get_new_announcements(crawl_date)
-                await email_notifier.send_crawl_report_async(
+                await asyncio.to_thread(
+                    discord_notifier.send_crawl_report,
                     crawl_date,
                     stats,
                     new_anns,
-                    job_id=job_id,
                 )
             except Exception as e:
-                logger.warning("邮件报告发送失败，不影响爬取结果: %s", e)
+                logger.warning("Discord 通知发送失败，不影响爬取结果: %s", e)
 
     async def _run_backfill(
         self,

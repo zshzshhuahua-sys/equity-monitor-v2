@@ -18,6 +18,9 @@ from ..utils.validators import detect_exchange
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
+# 执行价偏离警告阈值（50%）
+STRIKE_PRICE_WARN_THRESHOLD = 0.5
+
 
 @router.post("/csv")
 async def import_csv(file: UploadFile = File(...)):
@@ -51,15 +54,33 @@ async def import_csv(file: UploadFile = File(...)):
                     full_code = f"{symbol}.{exchange}"
                     strike_price = float(row['strike_price'])
                     name = str(row.get('name', '')).strip() if pd.notna(row.get('name')) else ''
-                    
-                    # 如果没有提供名称，尝试获取
-                    if not name:
-                        try:
-                            price_data = await akshare_client.get_price(full_code)
-                            if price_data:
+
+                    # 获取实时价格，用于验证执行价合理性
+                    current_price = None
+                    try:
+                        price_data = await akshare_client.get_price(full_code)
+                        if price_data:
+                            current_price = price_data.current_price
+                            if not name:
                                 name = price_data.name
-                        except:
-                            pass
+                            # 执行价合理性校验：偏离实时价格超过阈值则拒绝
+                            if current_price is not None and current_price > 0:
+                                diff_ratio = abs(strike_price - current_price) / current_price
+                                if diff_ratio > STRIKE_PRICE_WARN_THRESHOLD:
+                                    errors.append({
+                                        "row": idx+2,
+                                        "message": f"执行价 {strike_price} 偏离实时价 {current_price:.2f} 超过{int(STRIKE_PRICE_WARN_THRESHOLD*100)}%，请确认执行价是否正确"
+                                    })
+                                    continue
+                            elif current_price is not None and current_price <= 0:
+                                errors.append({
+                                    "row": idx+2,
+                                    "message": f"股票 {full_code} 实时价格无效({current_price})，请稍后重试"
+                                })
+                                continue
+                    except Exception:
+                        # 网络等异常不影响导入，仅记录
+                        pass
                     
                     # 检查是否已存在
                     stmt = select(StockWatch).where(
